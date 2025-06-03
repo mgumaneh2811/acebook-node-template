@@ -63,3 +63,7 @@ typings/
 # cypress.io
 cypress/screenshots
 cypress/videos
+
+.DS_Store
+.github/workflows/deploy-template.txt
+app.zip
