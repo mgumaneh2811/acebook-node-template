@@ -1,0 +1,74 @@
+name: Deploy to EC2 through a bucket using Codedeploy
+
+run-name: Deployment by @${{ github.actor }}
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  all-jobs:
+    runs-on: ubuntu-latest  
+    
+    services:
+      mongo:
+        image: mongo:8.0
+        ports:
+          - 27017:27017
+# we can add health checks to ensure that mongo is runnning. 
+
+    steps:
+      - name: Checkout code 
+        uses: actions/checkout@v3
+# this can be changed for uses: checkout@main
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with: 
+          node-version: 23
+    
+      - name: Install Dependencies and dev tools
+        run: npm install
+# npm install --save-dev eslint@8   
+# npm install --save-dev eslint-plugin-unicorn@48.0.1
+
+      - name: Start server
+        run: npm start
+
+      - name: access server
+        run: curl --fail http://localhost:3000/ 
+
+      - name: start test server in background
+        run: npm run start:test
+
+      - name: access test server
+        run: curl --fail http://localhost:3030/
+
+      - name: zip codebase
+        run: |
+          zip -r app.zip . -x ".git/*" ".gitignore/" ".github/*" "node_modules/*"
+
+      - name: Upload to S3
+        uses: aws-actions/s3-sync@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+          local-dir: .
+          dest-dir: .
+
+      - name: Register & trigger CodeDeploy
+        run: |
+          aws deploy create-deployment \
+            --application-name last step ${{ secrets.CODEDEPLOY_APP }} \
+            --deployment-group-name ${{ secrets.CODEDEPLOY_GROUP }} \
+            --s3-location bucket=${{ secrets.S3_BUCKET }},bundleType=zip,key=app.zip \
+            --region ${{ secrets.AWS_REGION }}
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+          CODEDEPLOY_APP: ${{ secrets.CODEDEPLOY_APP }}
+          CODEDEPLOY_GROUP: ${{ secrets.CODEDEPLOY_GROUP }}
