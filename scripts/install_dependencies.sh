@@ -12,6 +12,6 @@ fi
 
 # Install npm dependencies
 echo "Running npm install..."
-npm install
+sudo npm install
 
 echo "Dependencies installation completed."
